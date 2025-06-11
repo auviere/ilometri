@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aika-sovellus</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { margin: 2px; }
+    #user-list div { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Aika-sovellus (GitHub Pages -versio)</h1>
+
+  <div id="auth">
+    <h2>Rekisteröinti</h2>
+    <input id="reg-username" placeholder="Käyttäjänimi"><br>
+    <input id="reg-password" type="password" placeholder="Salasana"><br>
+    <div id="profile-images"></div>
+    <button onclick="register()">Rekisteröidy</button>
+
+    <hr>
+    <h2>Kirjaudu sisään</h2>
+    <input id="login-username" placeholder="Käyttäjänimi"><br>
+    <input id="login-password" type="password" placeholder="Salasana"><br>
+    <button onclick="login()">Kirjaudu</button>
+  </div>
+
+  <div id="app" style="display:none;">
+    <h2>Tervetuloa <span id="current-user"></span></h2>
+    <button onclick="addTime()">Lisää aikaa</button>
+    <hr>
+    <h2>Koostenäkymä</h2>
+    <div id="user-list"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
