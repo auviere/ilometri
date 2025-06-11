@@ -3,7 +3,7 @@ let selectedProfileImage = profileImages[0];
 let currentUser = null;
 let users = JSON.parse(localStorage.getItem("users") || "[]");
 
-// Profiilikuvien valinta
+// Näytä profiilikuvavalinta
 const profileImagesContainer = document.getElementById("profile-images");
 profileImages.forEach(img => {
   const btn = document.createElement("button");
@@ -16,45 +16,31 @@ function saveUsers() {
   localStorage.setItem("users", JSON.stringify(users));
 }
 
-// Rekisteröi uusi käyttäjä
+// Luo tai hae käyttäjä
 function register() {
-  const username = document.getElementById("reg-username").value;
-  const password = document.getElementById("reg-password").value;
-
-  if (users.find(u => u.username === username)) {
-    alert("Käyttäjänimi on jo käytössä!");
+  const username = document.getElementById("reg-username").value.trim();
+  if (!username) {
+    alert("Anna käyttäjänimi");
     return;
   }
 
-  const newUser = {
-    username,
-    password,
-    profileImage: selectedProfileImage,
-    timeLeft: 0,
-    lastUpdate: Date.now()
-  };
-  users.push(newUser);
-  saveUsers();
-  localStorage.setItem("loggedInUser", username);
-  loginUser(newUser);
-}
-
-// Kirjaa sisään käyttäjän
-function login() {
-  const username = document.getElementById("login-username").value;
-  const password = document.getElementById("login-password").value;
-
-  const user = users.find(u => u.username === username && u.password === password);
+  let user = users.find(u => u.username === username);
   if (!user) {
-    alert("Väärä käyttäjänimi tai salasana!");
-    return;
+    user = {
+      username,
+      profileImage: selectedProfileImage,
+      timeLeft: 0,
+      lastUpdate: Date.now()
+    };
+    users.push(user);
+    saveUsers();
   }
 
   localStorage.setItem("loggedInUser", username);
   loginUser(user);
 }
 
-// Sisäinen kirjautuminen (näytetään käyttöliittymä)
+// Kirjaa käyttäjän sisään ja näytä sovellus
 function loginUser(user) {
   currentUser = user;
   document.getElementById("current-user").textContent = `${user.username} ${user.profileImage}`;
@@ -71,7 +57,7 @@ function addTime() {
   saveUsers();
 }
 
-// Päivittää ajan yhdelle käyttäjälle
+// Päivitä yhden käyttäjän aika
 function updateUserTime(user) {
   const now = Date.now();
   const elapsed = Math.floor((now - user.lastUpdate) / 1000);
@@ -80,13 +66,13 @@ function updateUserTime(user) {
   user.lastUpdate = now;
 }
 
-// Päivittää kaikkien käyttäjien aikaa
+// Päivitä kaikkien käyttäjien ajat
 function updateAllUsers() {
   users.forEach(updateUserTime);
   saveUsers();
 }
 
-// Näyttää käyttäjien tiedot
+// Näytä käyttäjien tiedot koostenäkymässä
 function renderUsers() {
   const container = document.getElementById("user-list");
   container.innerHTML = "";
@@ -99,18 +85,16 @@ function renderUsers() {
   });
 }
 
-// Yritetään kirjautua automaattisesti
+// Tarkista automaattinen sisäänkirjautuminen
 window.onload = () => {
   const savedUsername = localStorage.getItem("loggedInUser");
   if (savedUsername) {
     const user = users.find(u => u.username === savedUsername);
-    if (user) {
-      loginUser(user);
-    }
+    if (user) loginUser(user);
   }
 };
 
-// Päivitetään näkymä jatkuvasti
+// Päivitä näkymä sekunnin välein
 setInterval(() => {
   updateAllUsers();
   renderUsers();
