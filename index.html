@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="fi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aika-sovellus</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
@@ -16,8 +16,15 @@
   <div id="auth">
     <h2>Rekisteröinti</h2>
     <input id="reg-username" placeholder="Käyttäjänimi"><br>
+    <input id="reg-password" type="password" placeholder="Salasana"><br>
     <div id="profile-images"></div>
     <button onclick="register()">Rekisteröidy</button>
+
+    <hr>
+    <h2>Kirjaudu sisään</h2>
+    <input id="login-username" placeholder="Käyttäjänimi"><br>
+    <input id="login-password" type="password" placeholder="Salasana"><br>
+    <button onclick="login()">Kirjaudu</button>
   </div>
 
   <div id="app" style="display:none;">
