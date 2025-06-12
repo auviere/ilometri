@@ -2,7 +2,7 @@ let users = [];
 let currentUser = null;
 let selectedProfileImage = "🐱";
 
-const GROWTH_DURATION = 1800; // seconds (30 min)
+const GROWTH_DURATION = 1800; // seconds
 const DECAY_PER_SECOND = 0.0000445;
 
 function selectImage(emoji) {
@@ -74,17 +74,33 @@ function addJoy() {
   currentUser.growths.push({ amount, start: now });
   currentUser.lastUpdate = now;
 
-  // Päivitetään huippu ja nolla-aika KIINTEÄSTI
-  const activeGrowths = currentUser.growths;
-  const growthSum = activeGrowths.reduce((sum, g) => sum + g.amount, 0);
-  const peakTime = now + GROWTH_DURATION * 1000;
-  const expectedJoy = currentUser.totalJoy + growthSum;
+  // Lasketaan realistinen odotettu huippu
+  const joyNow = currentUser.totalJoy;
+  let incomingGrowth = 0;
 
-  const zeroTime = peakTime + (expectedJoy / DECAY_PER_SECOND) * 1000;
+  const updatedGrowths = [];
 
-  currentUser.expectedPeakTime = peakTime;
-  currentUser.expectedPeakJoy = expectedJoy;
-  currentUser.nextZeroTime = zeroTime;
+  for (let g of currentUser.growths) {
+    const elapsed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
+    const remaining = GROWTH_DURATION - elapsed;
+    if (remaining > 0) {
+      const growthPortion = g.amount * (remaining / GROWTH_DURATION);
+      incomingGrowth += growthPortion;
+      updatedGrowths.push(g);
+    }
+  }
+
+  currentUser.growths = updatedGrowths;
+
+  const growthFinishTime = now + GROWTH_DURATION * 1000;
+  const decayDuringGrowth = DECAY_PER_SECOND * GROWTH_DURATION;
+
+  const expectedPeak = joyNow + incomingGrowth - decayDuringGrowth;
+  const timeUntilZero = expectedPeak > 0 ? (expectedPeak / DECAY_PER_SECOND) * 1000 : 0;
+
+  currentUser.expectedPeakJoy = expectedPeak;
+  currentUser.expectedPeakTime = growthFinishTime;
+  currentUser.nextZeroTime = growthFinishTime + timeUntilZero;
 
   saveUsers();
   renderUsers();
@@ -102,7 +118,6 @@ function updateUserState(user) {
     const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
     const portion = g.amount * (secondsPassed / GROWTH_DURATION);
     addedJoy += portion;
-
     if (secondsPassed < GROWTH_DURATION) stillGrowing.push(g);
   });
 
@@ -132,7 +147,7 @@ function renderUsers() {
   const now = Date.now();
 
   users.forEach(u => {
-    // Laske hetkellinen ilo
+    // Hetkellinen ilo
     let joyNow = u.totalJoy;
     u.growths.forEach(g => {
       const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
