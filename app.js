@@ -19,8 +19,10 @@ function saveUsers() {
 // Luo tai hae käyttäjä
 function register() {
   const username = document.getElementById("reg-username").value.trim();
-  if (!username) {
-    alert("Anna käyttäjänimi");
+  const extraValue = parseInt(document.getElementById("reg-extra").value.trim());
+
+  if (!username || isNaN(extraValue)) {
+    alert("Anna käyttäjänimi ja numeerinen lisäarvo.");
     return;
   }
 
@@ -29,6 +31,7 @@ function register() {
     user = {
       username,
       profileImage: selectedProfileImage,
+      extraValue,
       timeLeft: 0,
       lastUpdate: Date.now()
     };
@@ -80,7 +83,7 @@ function renderUsers() {
     const endTime = new Date(Date.now() + u.timeLeft * 1000);
     const endTimeStr = u.timeLeft > 0 ? endTime.toLocaleTimeString() : "-";
     const div = document.createElement("div");
-    div.textContent = `${u.profileImage} ${u.username} - jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}`;
+    div.textContent = `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}`;
     container.appendChild(div);
   });
 }
