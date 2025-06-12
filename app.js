@@ -1,132 +1,101 @@
-let users = [];
+const profileImages = ["🐱", "🐶", "🦊", "🐻", "🐼"];
+let selectedProfileImage = profileImages[0];
 let currentUser = null;
-let selectedProfileImage = "🐱";
+let users = JSON.parse(localStorage.getItem("users") || "[]");
 
-const GROWTH_DURATION = 1800; // seconds
-const DECAY_PER_SECOND = 0.0000445;
-
-function selectImage(emoji) {
-  selectedProfileImage = emoji;
-}
+// Näytä profiilikuvavalinta
+const profileImagesContainer = document.getElementById("profile-images");
+profileImages.forEach(img => {
+  const btn = document.createElement("button");
+  btn.textContent = img;
+  btn.onclick = () => selectedProfileImage = img;
+  profileImagesContainer.appendChild(btn);
+});
 
 function saveUsers() {
   localStorage.setItem("users", JSON.stringify(users));
 }
 
-function loadUsers() {
-  users = JSON.parse(localStorage.getItem("users") || "[]");
-  users.forEach(u => {
-    u.growths = u.growths || [];
-    u.lastUpdate = u.lastUpdate || Date.now();
-    u.maxJoy = u.maxJoy || 0;
-  });
-}
-
+// Luo tai hae käyttäjä
 function register() {
-  const username = document.getElementById("username").value.trim();
-  const extraValue = parseFloat(document.getElementById("extraValue").value);
-  if (!username || isNaN(extraValue)) {
-    alert("Syötä käyttäjänimi ja kelvollinen lisäarvo.");
+  const username = document.getElementById("reg-username").value.trim();
+  if (!username) {
+    alert("Anna käyttäjänimi");
     return;
   }
 
-  const user = {
-    username,
-    profileImage: selectedProfileImage,
-    extraValue,
-    growths: [],
-    lastUpdate: Date.now(),
-    maxJoy: 0
-  };
-
-  users.push(user);
-  currentUser = user;
-  saveUsers();
-  showApp();
-}
-
-function showApp() {
-  document.getElementById("register").style.display = "none";
-  document.getElementById("app").style.display = "block";
-  document.getElementById("current-user").textContent = currentUser.username;
-  renderUsers();
-}
-
-function addJoy() {
-  const now = Date.now();
-  const G = (15 / (currentUser.extraValue * 6800)) * 1000;
-  currentUser.growths.push({ amount: G, start: now });
-  saveUsers();
-  renderUsers();
-}
-
-function calculateJoy(user, now) {
-  let joy = 0;
-  let totalGrowth = 0;
-  let lastEndTime = 0;
-
-  for (let g of user.growths) {
-    const elapsed = (now - g.start) / 1000;
-    const growthDuration = Math.min(GROWTH_DURATION, Math.max(0, elapsed));
-    const partial = (growthDuration / GROWTH_DURATION) * g.amount;
-    joy += partial;
-    totalGrowth += g.amount;
-
-    const end = g.start + GROWTH_DURATION * 1000;
-    if (end > lastEndTime) lastEndTime = end;
+  let user = users.find(u => u.username === username);
+  if (!user) {
+    user = {
+      username,
+      profileImage: selectedProfileImage,
+      timeLeft: 0,
+      lastUpdate: Date.now()
+    };
+    users.push(user);
+    saveUsers();
   }
 
-  const secondsSinceStart = (now - user.growths[0]?.start || now) / 1000;
-  const decay = DECAY_PER_SECOND * secondsSinceStart;
-  joy -= decay;
-  if (joy < 0) joy = 0;
-  if (joy > user.maxJoy) user.maxJoy = joy;
-
-  // Peak value estimation
-  const decayUntilPeak = ((lastEndTime - (user.growths[0]?.start || now)) / 1000) * DECAY_PER_SECOND;
-  const expectedPeak = Math.max(0, totalGrowth - decayUntilPeak);
-
-  // Zero estimation
-  const zeroIn = joy / DECAY_PER_SECOND;
-  const zeroTime = joy > 0 ? now + zeroIn * 1000 : null;
-
-  return {
-    current: joy,
-    expectedPeak: expectedPeak,
-    peakTime: lastEndTime,
-    zeroTime: zeroTime
-  };
+  localStorage.setItem("loggedInUser", username);
+  loginUser(user);
 }
 
+// Kirjaa käyttäjän sisään ja näytä sovellus
+function loginUser(user) {
+  currentUser = user;
+  document.getElementById("current-user").textContent = `${user.username} ${user.profileImage}`;
+  document.getElementById("auth").style.display = "none";
+  document.getElementById("app").style.display = "block";
+}
+
+// Lisää aikaa
+function addTime() {
+  if (!currentUser) return;
+  updateUserTime(currentUser);
+  currentUser.timeLeft += 60;
+  currentUser.lastUpdate = Date.now();
+  saveUsers();
+}
+
+// Päivitä yhden käyttäjän aika
+function updateUserTime(user) {
+  const now = Date.now();
+  const elapsed = Math.floor((now - user.lastUpdate) / 1000);
+  user.timeLeft -= elapsed;
+  if (user.timeLeft < 0) user.timeLeft = 0;
+  user.lastUpdate = now;
+}
+
+// Päivitä kaikkien käyttäjien ajat
+function updateAllUsers() {
+  users.forEach(updateUserTime);
+  saveUsers();
+}
+
+// Näytä käyttäjien tiedot koostenäkymässä
 function renderUsers() {
   const container = document.getElementById("user-list");
   container.innerHTML = "";
-  const now = Date.now();
-
-  users.forEach(user => {
-    const stats = calculateJoy(user, now);
-
+  users.forEach(u => {
+    const endTime = new Date(Date.now() + u.timeLeft * 1000);
+    const endTimeStr = u.timeLeft > 0 ? endTime.toLocaleTimeString() : "-";
     const div = document.createElement("div");
-    div.innerHTML = `
-      <strong>${user.profileImage} ${user.username}</strong> (lisäarvo: ${user.extraValue})<br>
-      Hetkellinen ilo: ${stats.current.toFixed(3)}<br>
-      Odotettu huippu: ${stats.expectedPeak.toFixed(3)}<br>
-      Saavutettu huippu: ${user.maxJoy.toFixed(3)}<br>
-      Huippu klo: ${new Date(stats.peakTime).toLocaleTimeString()}<br>
-      Nolla klo: ${stats.zeroTime ? new Date(stats.zeroTime).toLocaleTimeString() : "-" }<br><br>
-    `;
+    div.textContent = `${u.profileImage} ${u.username} - jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}`;
     container.appendChild(div);
   });
 }
 
+// Tarkista automaattinen sisäänkirjautuminen
 window.onload = () => {
-  loadUsers();
-  if (users.length > 0) {
-    currentUser = users[users.length - 1];
-    showApp();
+  const savedUsername = localStorage.getItem("loggedInUser");
+  if (savedUsername) {
+    const user = users.find(u => u.username === savedUsername);
+    if (user) loginUser(user);
   }
-
-  setInterval(() => {
-    renderUsers();
-  }, 1000);
 };
+
+// Päivitä näkymä sekunnin välein
+setInterval(() => {
+  updateAllUsers();
+  renderUsers();
+}, 1000);
