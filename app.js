@@ -2,6 +2,12 @@ let users = JSON.parse(localStorage.getItem("users") || "[]");
 let currentUser = null;
 let selectedProfileImage = "🐱";
 
+let joyChart;
+let chartData = {
+  labels: [],
+  datasets: []
+};
+
 function selectImage(emoji) {
   selectedProfileImage = emoji;
 }
@@ -44,6 +50,8 @@ function showApp() {
   document.getElementById("register").style.display = "none";
   document.getElementById("app").style.display = "block";
   document.getElementById("current-user").textContent = currentUser.username;
+
+  initChart();
   updateAllUsers();
   renderUsers();
 }
@@ -54,7 +62,7 @@ function addJoy() {
   updateUserState(currentUser);
 
   const increase = (15 / (currentUser.extraValue * 6800)) * 1000;
-  const kasvunopeus = increase / 1800; // 30min
+  const kasvunopeus = increase / 1800; // 30 min
 
   currentUser.iloKasvunopeus += kasvunopeus;
   currentUser.lastUpdate = Date.now();
@@ -65,14 +73,18 @@ function addJoy() {
 
 function updateUserState(user) {
   const now = Date.now();
-  const elapsed = Math.floor((now - user.lastUpdate) / 1000);
+  let elapsed = Math.floor((now - user.lastUpdate) / 1000); // sekunneissa
+
   if (elapsed <= 0) return;
 
-  user.ilo += user.iloKasvunopeus * elapsed;
-  user.ilo -= 0.0000445 * elapsed;
-  if (user.ilo < 0) user.ilo = 0;
+  for (let i = 0; i < elapsed; i++) {
+    user.ilo += user.iloKasvunopeus;
+    user.ilo -= 0.0000445;
+    if (user.ilo < 0) user.ilo = 0;
 
-  user.iloKasvunopeus = Math.max(0, user.iloKasvunopeus - (user.iloKasvunopeus * (elapsed / 1800)));
+    user.iloKasvunopeus -= user.iloKasvunopeus / (1800 - i);
+    if (user.iloKasvunopeus < 0) user.iloKasvunopeus = 0;
+  }
 
   user.lastUpdate = now;
 }
@@ -86,8 +98,9 @@ function renderUsers() {
   const container = document.getElementById("user-list");
   container.innerHTML = "";
 
+  const now = Date.now();
+
   users.forEach(u => {
-    const now = Date.now();
     const kasvuaika = 1800;
     const remainingGrowthTime = Math.min(kasvuaika, u.iloKasvunopeus > 0 ? kasvuaika : 0);
     const additionalIlo = u.iloKasvunopeus * remainingGrowthTime;
@@ -112,14 +125,74 @@ function renderUsers() {
   });
 }
 
-// Ladataan mahdollisesti aiemmin kirjautunut käyttäjä
+function initChart() {
+  const ctx = document.getElementById("joyChart").getContext("2d");
+
+  chartData.datasets = users.map(user => ({
+    label: user.username,
+    data: [],
+    borderColor: getRandomColor(),
+    fill: false
+  }));
+
+  joyChart = new Chart(ctx, {
+    type: 'line',
+    data: chartData,
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'minute'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Ilon määrä'
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateChart() {
+  const now = new Date();
+
+  chartData.labels.push(now);
+  if (chartData.labels.length > 60) chartData.labels.shift();
+
+  users.forEach((user, index) => {
+    const ilo = parseFloat(user.ilo.toFixed(2));
+    const dataset = chartData.datasets[index];
+    dataset.data.push({ x: now, y: ilo });
+    if (dataset.data.length > 60) dataset.data.shift();
+  });
+
+  joyChart.update();
+}
+
+function getRandomColor() {
+  const r = Math.floor(Math.random()*200);
+  const g = Math.floor(Math.random()*200);
+  const b = Math.floor(Math.random()*200);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Automaattinen kirjautuminen jos käyttäjiä on
 window.onload = () => {
   if (users.length > 0) {
     currentUser = users[users.length - 1];
     showApp();
   }
+
   setInterval(() => {
     updateAllUsers();
     renderUsers();
+    updateChart();
   }, 1000);
 };

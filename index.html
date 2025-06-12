@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ilosovellus</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>Ilosovellus</h1>
@@ -26,6 +27,9 @@
     <button onclick="addJoy()">Lisää iloa ✨</button>
     <h3>Käyttäjät</h3>
     <div id="user-list"></div>
+
+    <h3>Ilon kehitysgraafi</h3>
+    <canvas id="joyChart" width="400" height="200"></canvas>
   </div>
 
   <script src="app.js"></script>
