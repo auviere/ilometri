@@ -33,7 +33,9 @@ function register() {
       profileImage: selectedProfileImage,
       extraValue,
       timeLeft: 0,
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
+      ilo: 0,
+      iloKasvunopeus: 0
     };
     users.push(user);
     saveUsers();
@@ -56,9 +58,46 @@ function addTime() {
   if (!currentUser) return;
   updateUserTime(currentUser);
   currentUser.timeLeft += 60;
+  const increase = (15 / (currentUser.extraValue * 6800)) * 1000;
+  const kasvunopeus = increase / 1800;
+  currentUser.iloKasvunopeus += kasvunopeus;
   currentUser.lastUpdate = Date.now();
   saveUsers();
 }
+
+function updateUserState(user) {
+  const now = Date.now();
+  const elapsed = Math.floor((now - user.lastUpdate) / 1000);
+  if (elapsed <= 0) return;
+
+  // Aika pienenee
+  user.timeLeft -= elapsed;
+  if (user.timeLeft < 0) user.timeLeft = 0;
+
+  // Ilon kasvu
+  const iloKasvu = user.iloKasvunopeus * elapsed;
+  user.ilo += iloKasvu;
+
+  // Ilon väheneminen: 0.00267/min = 0.0000445/s
+  const iloVähennys = 0.0000445 * elapsed;
+  user.ilo -= iloVähennys;
+
+  // Rajat
+  if (user.ilo < 0) user.ilo = 0;
+
+  // Ilon kasvu päättyy 30 minuutin (1800s) päästä
+  const kasvunVähenemä = elapsed;
+  const uusiKasvunopeus = user.iloKasvunopeus - (user.iloKasvunopeus * (kasvunVähenemä / 1800));
+  user.iloKasvunopeus = Math.max(0, uusiKasvunopeus);
+
+  user.lastUpdate = now;
+}
+
+function updateAllUsers() {
+  users.forEach(updateUserState);
+  saveUsers();
+}
+
 
 // Päivitä yhden käyttäjän aika
 function updateUserTime(user) {
@@ -83,7 +122,7 @@ function renderUsers() {
     const endTime = new Date(Date.now() + u.timeLeft * 1000);
     const endTimeStr = u.timeLeft > 0 ? endTime.toLocaleTimeString() : "-";
     const div = document.createElement("div");
-    div.textContent = `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}`;
+    div.textContent = `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}, ilo: ${u.ilo.toFixed(3)}`;
     container.appendChild(div);
   });
 }
