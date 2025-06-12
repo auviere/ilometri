@@ -1,6 +1,8 @@
 let users = [];
 let currentUser = null;
 let selectedProfileImage = "🐱";
+const GROWTH_DURATION = 1800; // 30min in seconds
+const DECAY_PER_SECOND = 0.0000445; // ilo vähenee 0.00267/min = 0.0000445/s
 
 function selectImage(emoji) {
   selectedProfileImage = emoji;
@@ -12,13 +14,10 @@ function saveUsers() {
 
 function loadUsers() {
   users = JSON.parse(localStorage.getItem("users") || "[]");
-
-  // Varmista että lastUpdate on määritetty
-  const now = Date.now();
   users.forEach(user => {
-    if (!user.lastUpdate || isNaN(user.lastUpdate)) {
-      user.lastUpdate = now;
-    }
+    if (!user.growths) user.growths = [];
+    if (!user.lastUpdate) user.lastUpdate = Date.now();
+    if (isNaN(user.totalJoy)) user.totalJoy = 0;
   });
 }
 
@@ -40,8 +39,8 @@ function register() {
     username,
     profileImage: selectedProfileImage,
     extraValue,
-    ilo: 0,
-    iloKasvunopeus: 0,
+    growths: [],
+    totalJoy: 0,
     lastUpdate: Date.now()
   };
 
@@ -63,29 +62,45 @@ function addJoy() {
 
   updateUserState(currentUser);
 
-  const increase = (15 / (currentUser.extraValue * 6800)) * 1000;
-  const kasvunopeus = increase / 1800; // jaetaan 30 minuuttiin
+  const now = Date.now();
+  const amount = (15 / (currentUser.extraValue * 6800)) * 1000;
 
-  currentUser.iloKasvunopeus += kasvunopeus;
-  currentUser.lastUpdate = Date.now();
+  currentUser.growths.push({
+    amount,
+    start: now
+  });
 
+  currentUser.lastUpdate = now;
   saveUsers();
   renderUsers();
 }
 
 function updateUserState(user) {
   const now = Date.now();
-  let elapsed = Math.floor((now - user.lastUpdate) / 1000);
+  const elapsed = Math.floor((now - user.lastUpdate) / 1000);
+
   if (elapsed <= 0) return;
 
-  for (let i = 0; i < elapsed; i++) {
-    user.ilo += user.iloKasvunopeus;
-    user.ilo -= 0.0000445;
-    if (user.ilo < 0) user.ilo = 0;
+  // Päivitä ilo: kasvuosuudet ja vähennys
+  let addedJoy = 0;
 
-    user.iloKasvunopeus -= user.iloKasvunopeus / (1800 - i);
-    if (user.iloKasvunopeus < 0) user.iloKasvunopeus = 0;
-  }
+  const newGrowths = [];
+
+  user.growths.forEach(g => {
+    const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
+    if (secondsPassed > 0) {
+      const portion = g.amount * (secondsPassed / GROWTH_DURATION);
+      addedJoy += portion;
+    }
+    if (secondsPassed < GROWTH_DURATION) {
+      newGrowths.push(g); // säilytä edelleen kasvava
+    }
+  });
+
+  user.growths = newGrowths;
+  user.totalJoy += addedJoy;
+  user.totalJoy -= DECAY_PER_SECOND * elapsed;
+  if (user.totalJoy < 0) user.totalJoy = 0;
 
   user.lastUpdate = now;
 }
@@ -102,17 +117,27 @@ function renderUsers() {
   const now = Date.now();
 
   users.forEach(u => {
-    const kasvuaika = 1800;
-    const remainingGrowthTime = Math.min(kasvuaika, u.iloKasvunopeus > 0 ? kasvuaika : 0);
-    const additionalIlo = u.iloKasvunopeus * remainingGrowthTime;
-    const futureIlo = u.ilo + additionalIlo;
+    // Laske hetkellinen ilo
+    let currentJoy = u.totalJoy;
 
-    const peakTime = new Date(now + remainingGrowthTime * 1000);
-    const peakTimeStr = (additionalIlo > 0) ? peakTime.toLocaleTimeString() : "-";
+    u.growths.forEach(g => {
+      const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
+      const portion = g.amount * (secondsPassed / GROWTH_DURATION);
+      currentJoy += portion;
+    });
 
+    // Laske huipun hetki
+    const latestGrowth = u.growths[u.growths.length - 1];
+    let peakTimeStr = "-";
+    if (latestGrowth) {
+      const peakTime = new Date(latestGrowth.start + GROWTH_DURATION * 1000);
+      peakTimeStr = peakTime.toLocaleTimeString();
+    }
+
+    // Laske nolla-aika
     let zeroTimeStr = "-";
-    if (futureIlo > 0) {
-      const secondsUntilZero = futureIlo / 0.0000445;
+    if (currentJoy > 0) {
+      const secondsUntilZero = currentJoy / DECAY_PER_SECOND;
       const zeroTime = new Date(now + secondsUntilZero * 1000);
       zeroTimeStr = zeroTime.toLocaleTimeString();
     }
@@ -120,8 +145,7 @@ function renderUsers() {
     const div = document.createElement("div");
     div.textContent =
       `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – ` +
-      `ilo: ${u.ilo.toFixed(3)}, huippu: ${futureIlo.toFixed(3)} klo ${peakTimeStr}, ` +
-      `nolla klo ${zeroTimeStr}`;
+      `ilo: ${currentJoy.toFixed(3)}, huippu klo: ${peakTimeStr}, nolla klo: ${zeroTimeStr}`;
     container.appendChild(div);
   });
 }
