@@ -2,8 +2,8 @@ let users = [];
 let currentUser = null;
 let selectedProfileImage = "🐱";
 
-const GROWTH_DURATION = 1800; // 30 min in seconds
-const DECAY_PER_SECOND = 0.0000445; // = 0.00267/min
+const GROWTH_DURATION = 1800; // seconds
+const DECAY_PER_SECOND = 0.0000445;
 
 function selectImage(emoji) {
   selectedProfileImage = emoji;
@@ -45,8 +45,9 @@ function register() {
     totalJoy: 0,
     maxJoy: 0,
     lastUpdate: Date.now(),
-    nextZeroTime: null,
-    expectedPeakJoy: 0
+    expectedPeakJoy: 0,
+    expectedPeakTime: null,
+    nextZeroTime: null
   };
 
   users.push(user);
@@ -70,13 +71,9 @@ function addJoy() {
   const now = Date.now();
   const amount = (15 / (currentUser.extraValue * 6800)) * 1000;
 
-  currentUser.growths.push({
-    amount,
-    start: now
-  });
-
+  currentUser.growths.push({ amount, start: now });
   currentUser.lastUpdate = now;
-  currentUser.nextZeroTime = null; // force recalculation
+
   saveUsers();
   renderUsers();
 }
@@ -87,47 +84,48 @@ function updateUserState(user) {
   if (elapsed <= 0) return;
 
   let addedJoy = 0;
-  let stillGrowing = [];
+  const stillGrowing = [];
 
   user.growths.forEach(g => {
     const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
     const portion = g.amount * (secondsPassed / GROWTH_DURATION);
     addedJoy += portion;
 
-    if (secondsPassed < GROWTH_DURATION) {
-      stillGrowing.push(g);
-    }
+    if (secondsPassed < GROWTH_DURATION) stillGrowing.push(g);
   });
 
-  user.growths = stillGrowing;
   user.totalJoy += addedJoy;
 
   const decay = DECAY_PER_SECOND * elapsed;
   user.totalJoy -= decay;
   if (user.totalJoy < 0) user.totalJoy = 0;
 
-  // Päivitä huippuarvo
   if (user.totalJoy > user.maxJoy) {
     user.maxJoy = user.totalJoy;
   }
 
-  // Laske odotettu huippuarvo
-  let futureGain = 0;
-  user.growths.forEach(g => {
-    const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
-    futureGain += g.amount * ((GROWTH_DURATION - secondsPassed) / GROWTH_DURATION);
-  });
+  user.growths = stillGrowing;
+  user.lastUpdate = now;
+
+  // Lasketaan absoluuttinen odotettu huippu
+  const futureGain = user.growths.reduce((sum, g) => sum + g.amount, 0);
   user.expectedPeakJoy = user.totalJoy + futureGain;
 
-  // Kiinteä nolla-aika
-  if (user.totalJoy > 0) {
-    const secondsToZero = user.totalJoy / DECAY_PER_SECOND;
-    user.nextZeroTime = new Date(now + secondsToZero * 1000).getTime();
+  // Huipun ajankohta = viimeisin kasvu + 30 min
+  if (user.growths.length > 0) {
+    const latestGrowth = user.growths[user.growths.length - 1];
+    user.expectedPeakTime = latestGrowth.start + GROWTH_DURATION * 1000;
+  } else {
+    user.expectedPeakTime = null;
+  }
+
+  // Nolla-aika = huipun aika + (huippu / laskentanopeus)
+  if (user.expectedPeakTime && user.expectedPeakJoy > 0) {
+    const zeroSeconds = user.expectedPeakJoy / DECAY_PER_SECOND;
+    user.nextZeroTime = user.expectedPeakTime + zeroSeconds * 1000;
   } else {
     user.nextZeroTime = null;
   }
-
-  user.lastUpdate = now;
 }
 
 function updateAllUsers() {
@@ -142,20 +140,16 @@ function renderUsers() {
   const now = Date.now();
 
   users.forEach(u => {
-    // Hetkellinen ilo
+    // Laske hetkellinen ilo
     let joyNow = u.totalJoy;
-
     u.growths.forEach(g => {
       const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
       joyNow += g.amount * (secondsPassed / GROWTH_DURATION);
     });
 
-    // Viimeisin kasvu huippua varten
-    const latestGrowth = u.growths.length > 0 ? u.growths[u.growths.length - 1] : null;
-    const peakTimeStr = latestGrowth
-      ? new Date(latestGrowth.start + GROWTH_DURATION * 1000).toLocaleTimeString()
+    const peakTimeStr = u.expectedPeakTime
+      ? new Date(u.expectedPeakTime).toLocaleTimeString()
       : "-";
-
     const zeroTimeStr = u.nextZeroTime
       ? new Date(u.nextZeroTime).toLocaleTimeString()
       : "-";
