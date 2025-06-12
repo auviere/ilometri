@@ -2,7 +2,7 @@ let users = [];
 let currentUser = null;
 let selectedProfileImage = "🐱";
 
-const GROWTH_DURATION = 1800; // seconds
+const GROWTH_DURATION = 1800; // seconds (30 min)
 const DECAY_PER_SECOND = 0.0000445;
 
 function selectImage(emoji) {
@@ -74,6 +74,18 @@ function addJoy() {
   currentUser.growths.push({ amount, start: now });
   currentUser.lastUpdate = now;
 
+  // Päivitetään huippu ja nolla-aika KIINTEÄSTI
+  const activeGrowths = currentUser.growths;
+  const growthSum = activeGrowths.reduce((sum, g) => sum + g.amount, 0);
+  const peakTime = now + GROWTH_DURATION * 1000;
+  const expectedJoy = currentUser.totalJoy + growthSum;
+
+  const zeroTime = peakTime + (expectedJoy / DECAY_PER_SECOND) * 1000;
+
+  currentUser.expectedPeakTime = peakTime;
+  currentUser.expectedPeakJoy = expectedJoy;
+  currentUser.nextZeroTime = zeroTime;
+
   saveUsers();
   renderUsers();
 }
@@ -106,26 +118,6 @@ function updateUserState(user) {
 
   user.growths = stillGrowing;
   user.lastUpdate = now;
-
-  // Lasketaan absoluuttinen odotettu huippu
-  const futureGain = user.growths.reduce((sum, g) => sum + g.amount, 0);
-  user.expectedPeakJoy = user.totalJoy + futureGain;
-
-  // Huipun ajankohta = viimeisin kasvu + 30 min
-  if (user.growths.length > 0) {
-    const latestGrowth = user.growths[user.growths.length - 1];
-    user.expectedPeakTime = latestGrowth.start + GROWTH_DURATION * 1000;
-  } else {
-    user.expectedPeakTime = null;
-  }
-
-  // Nolla-aika = huipun aika + (huippu / laskentanopeus)
-  if (user.expectedPeakTime && user.expectedPeakJoy > 0) {
-    const zeroSeconds = user.expectedPeakJoy / DECAY_PER_SECOND;
-    user.nextZeroTime = user.expectedPeakTime + zeroSeconds * 1000;
-  } else {
-    user.nextZeroTime = null;
-  }
 }
 
 function updateAllUsers() {
