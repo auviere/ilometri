@@ -3,30 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Aika-sovellus</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    button { margin: 2px; }
-    #user-list div { margin-bottom: 4px; }
-  </style>
+  <title>Ilosovellus</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Aika-sovellus (GitHub Pages -versio)</h1>
+  <h1>Ilosovellus</h1>
 
-  <div id="auth">
-  <h2>Luo käyttäjä</h2>
-  <input id="reg-username" placeholder="Käyttäjänimi"><br>
-  <input id="reg-extra" placeholder="Lisäarvo (esim. 10)"><br>
-  <div id="profile-images"></div>
-  <button onclick="register()">Aloita</button>
-</div>
-
+  <div id="register">
+    <h2>Rekisteröidy</h2>
+    <input id="username" placeholder="Käyttäjänimi" />
+    <input id="extraValue" type="number" placeholder="Lisäarvo (numero)" />
+    <div id="profile-images">
+      <button onclick="selectImage('🐱')">🐱</button>
+      <button onclick="selectImage('🐶')">🐶</button>
+      <button onclick="selectImage('🦊')">🦊</button>
+    </div>
+    <button onclick="register()">Rekisteröidy</button>
+  </div>
 
   <div id="app" style="display:none;">
-    <h2>Tervetuloa <span id="current-user"></span></h2>
-    <button onclick="addTime()">Lisää aikaa</button>
-    <hr>
-    <h2>Koostenäkymä</h2>
+    <h2>Tervetuloa, <span id="current-user"></span>!</h2>
+    <button onclick="addJoy()">Lisää iloa ✨</button>
+    <h3>Käyttäjät</h3>
     <div id="user-list"></div>
   </div>
 

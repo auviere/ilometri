@@ -1,68 +1,66 @@
-const profileImages = ["🐱", "🐶", "🦊", "🐻", "🐼"];
-let selectedProfileImage = profileImages[0];
-let currentUser = null;
 let users = JSON.parse(localStorage.getItem("users") || "[]");
+let currentUser = null;
+let selectedProfileImage = "🐱";
 
-// Näytä profiilikuvavalinta
-const profileImagesContainer = document.getElementById("profile-images");
-profileImages.forEach(img => {
-  const btn = document.createElement("button");
-  btn.textContent = img;
-  btn.onclick = () => selectedProfileImage = img;
-  profileImagesContainer.appendChild(btn);
-});
+function selectImage(emoji) {
+  selectedProfileImage = emoji;
+}
+
+function register() {
+  const username = document.getElementById("username").value.trim();
+  const extraValue = parseFloat(document.getElementById("extraValue").value);
+
+  if (!username || isNaN(extraValue)) {
+    alert("Syötä nimi ja kelvollinen lisäarvo.");
+    return;
+  }
+
+  const existing = users.find(u => u.username === username);
+  if (existing) {
+    alert("Käyttäjänimi on jo käytössä.");
+    return;
+  }
+
+  const user = {
+    username,
+    profileImage: selectedProfileImage,
+    extraValue,
+    ilo: 0,
+    iloKasvunopeus: 0,
+    lastUpdate: Date.now()
+  };
+
+  users.push(user);
+  currentUser = user;
+  saveUsers();
+  showApp();
+}
 
 function saveUsers() {
   localStorage.setItem("users", JSON.stringify(users));
 }
 
-// Luo tai hae käyttäjä
-function register() {
-  const username = document.getElementById("reg-username").value.trim();
-  const extraValue = parseInt(document.getElementById("reg-extra").value.trim());
-
-  if (!username || isNaN(extraValue)) {
-    alert("Anna käyttäjänimi ja numeerinen lisäarvo.");
-    return;
-  }
-
-  let user = users.find(u => u.username === username);
-  if (!user) {
-    user = {
-      username,
-      profileImage: selectedProfileImage,
-      extraValue,
-      timeLeft: 0,
-      lastUpdate: Date.now(),
-      ilo: 0,
-      iloKasvunopeus: 0
-    };
-    users.push(user);
-    saveUsers();
-  }
-
-  localStorage.setItem("loggedInUser", username);
-  loginUser(user);
-}
-
-// Kirjaa käyttäjän sisään ja näytä sovellus
-function loginUser(user) {
-  currentUser = user;
-  document.getElementById("current-user").textContent = `${user.username} ${user.profileImage}`;
-  document.getElementById("auth").style.display = "none";
+function showApp() {
+  document.getElementById("register").style.display = "none";
   document.getElementById("app").style.display = "block";
+  document.getElementById("current-user").textContent = currentUser.username;
+  updateAllUsers();
+  renderUsers();
 }
 
-// Lisää aikaa
-function addTime() {
+function addJoy() {
   if (!currentUser) return;
-  updateUserTime(currentUser);
-  currentUser.timeLeft += 60;
+
+  updateUserState(currentUser);
+
   const increase = (15 / (currentUser.extraValue * 6800)) * 1000;
-  const kasvunopeus = increase / 1800;
+  const kasvunopeus = increase / 1800; // 30min
+
   currentUser.iloKasvunopeus += kasvunopeus;
   currentUser.lastUpdate = Date.now();
+
   saveUsers();
+  renderUsers();
 }
 
 function updateUserState(user) {
@@ -70,25 +68,11 @@ function updateUserState(user) {
   const elapsed = Math.floor((now - user.lastUpdate) / 1000);
   if (elapsed <= 0) return;
 
-  // Aika pienenee
-  user.timeLeft -= elapsed;
-  if (user.timeLeft < 0) user.timeLeft = 0;
-
-  // Ilon kasvu
-  const iloKasvu = user.iloKasvunopeus * elapsed;
-  user.ilo += iloKasvu;
-
-  // Ilon väheneminen: 0.00267/min = 0.0000445/s
-  const iloVähennys = 0.0000445 * elapsed;
-  user.ilo -= iloVähennys;
-
-  // Rajat
+  user.ilo += user.iloKasvunopeus * elapsed;
+  user.ilo -= 0.0000445 * elapsed;
   if (user.ilo < 0) user.ilo = 0;
 
-  // Ilon kasvu päättyy 30 minuutin (1800s) päästä
-  const kasvunVähenemä = elapsed;
-  const uusiKasvunopeus = user.iloKasvunopeus - (user.iloKasvunopeus * (kasvunVähenemä / 1800));
-  user.iloKasvunopeus = Math.max(0, uusiKasvunopeus);
+  user.iloKasvunopeus = Math.max(0, user.iloKasvunopeus - (user.iloKasvunopeus * (elapsed / 1800)));
 
   user.lastUpdate = now;
 }
@@ -98,46 +82,44 @@ function updateAllUsers() {
   saveUsers();
 }
 
-
-// Päivitä yhden käyttäjän aika
-function updateUserTime(user) {
-  const now = Date.now();
-  const elapsed = Math.floor((now - user.lastUpdate) / 1000);
-  user.timeLeft -= elapsed;
-  if (user.timeLeft < 0) user.timeLeft = 0;
-  user.lastUpdate = now;
-}
-
-// Päivitä kaikkien käyttäjien ajat
-function updateAllUsers() {
-  users.forEach(updateUserTime);
-  saveUsers();
-}
-
-// Näytä käyttäjien tiedot koostenäkymässä
 function renderUsers() {
   const container = document.getElementById("user-list");
   container.innerHTML = "";
+
   users.forEach(u => {
-    const endTime = new Date(Date.now() + u.timeLeft * 1000);
-    const endTimeStr = u.timeLeft > 0 ? endTime.toLocaleTimeString() : "-";
+    const now = Date.now();
+    const kasvuaika = 1800;
+    const remainingGrowthTime = Math.min(kasvuaika, u.iloKasvunopeus > 0 ? kasvuaika : 0);
+    const additionalIlo = u.iloKasvunopeus * remainingGrowthTime;
+    const futureIlo = u.ilo + additionalIlo;
+
+    const peakTime = new Date(now + remainingGrowthTime * 1000);
+    const peakTimeStr = (additionalIlo > 0) ? peakTime.toLocaleTimeString() : "-";
+
+    let zeroTimeStr = "-";
+    if (futureIlo > 0) {
+      const secondsUntilZero = futureIlo / 0.0000445;
+      const zeroTime = new Date(now + secondsUntilZero * 1000);
+      zeroTimeStr = zeroTime.toLocaleTimeString();
+    }
+
     const div = document.createElement("div");
-    div.textContent = `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – jäljellä: ${u.timeLeft}s, päättyy: ${endTimeStr}, ilo: ${u.ilo.toFixed(3)}`;
+    div.textContent =
+      `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – ` +
+      `ilo: ${u.ilo.toFixed(3)}, huippu: ${futureIlo.toFixed(3)} klo ${peakTimeStr}, ` +
+      `nolla klo ${zeroTimeStr}`;
     container.appendChild(div);
   });
 }
 
-// Tarkista automaattinen sisäänkirjautuminen
+// Ladataan mahdollisesti aiemmin kirjautunut käyttäjä
 window.onload = () => {
-  const savedUsername = localStorage.getItem("loggedInUser");
-  if (savedUsername) {
-    const user = users.find(u => u.username === savedUsername);
-    if (user) loginUser(user);
+  if (users.length > 0) {
+    currentUser = users[users.length - 1];
+    showApp();
   }
+  setInterval(() => {
+    updateAllUsers();
+    renderUsers();
+  }, 1000);
 };
-
-// Päivitä näkymä sekunnin välein
-setInterval(() => {
-  updateAllUsers();
-  renderUsers();
-}, 1000);
