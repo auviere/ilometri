@@ -1,8 +1,9 @@
 let users = [];
 let currentUser = null;
 let selectedProfileImage = "🐱";
-const GROWTH_DURATION = 1800; // 30min in seconds
-const DECAY_PER_SECOND = 0.0000445; // ilo vähenee 0.00267/min = 0.0000445/s
+
+const GROWTH_DURATION = 1800; // 30 min in seconds
+const DECAY_PER_SECOND = 0.0000445; // = 0.00267/min
 
 function selectImage(emoji) {
   selectedProfileImage = emoji;
@@ -18,6 +19,7 @@ function loadUsers() {
     if (!user.growths) user.growths = [];
     if (!user.lastUpdate) user.lastUpdate = Date.now();
     if (isNaN(user.totalJoy)) user.totalJoy = 0;
+    if (isNaN(user.maxJoy)) user.maxJoy = 0;
   });
 }
 
@@ -41,7 +43,10 @@ function register() {
     extraValue,
     growths: [],
     totalJoy: 0,
-    lastUpdate: Date.now()
+    maxJoy: 0,
+    lastUpdate: Date.now(),
+    nextZeroTime: null,
+    expectedPeakJoy: 0
   };
 
   users.push(user);
@@ -71,6 +76,7 @@ function addJoy() {
   });
 
   currentUser.lastUpdate = now;
+  currentUser.nextZeroTime = null; // force recalculation
   saveUsers();
   renderUsers();
 }
@@ -78,29 +84,48 @@ function addJoy() {
 function updateUserState(user) {
   const now = Date.now();
   const elapsed = Math.floor((now - user.lastUpdate) / 1000);
-
   if (elapsed <= 0) return;
 
-  // Päivitä ilo: kasvuosuudet ja vähennys
   let addedJoy = 0;
-
-  const newGrowths = [];
+  let stillGrowing = [];
 
   user.growths.forEach(g => {
     const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
-    if (secondsPassed > 0) {
-      const portion = g.amount * (secondsPassed / GROWTH_DURATION);
-      addedJoy += portion;
-    }
+    const portion = g.amount * (secondsPassed / GROWTH_DURATION);
+    addedJoy += portion;
+
     if (secondsPassed < GROWTH_DURATION) {
-      newGrowths.push(g); // säilytä edelleen kasvava
+      stillGrowing.push(g);
     }
   });
 
-  user.growths = newGrowths;
+  user.growths = stillGrowing;
   user.totalJoy += addedJoy;
-  user.totalJoy -= DECAY_PER_SECOND * elapsed;
+
+  const decay = DECAY_PER_SECOND * elapsed;
+  user.totalJoy -= decay;
   if (user.totalJoy < 0) user.totalJoy = 0;
+
+  // Päivitä huippuarvo
+  if (user.totalJoy > user.maxJoy) {
+    user.maxJoy = user.totalJoy;
+  }
+
+  // Laske odotettu huippuarvo
+  let futureGain = 0;
+  user.growths.forEach(g => {
+    const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
+    futureGain += g.amount * ((GROWTH_DURATION - secondsPassed) / GROWTH_DURATION);
+  });
+  user.expectedPeakJoy = user.totalJoy + futureGain;
+
+  // Kiinteä nolla-aika
+  if (user.totalJoy > 0) {
+    const secondsToZero = user.totalJoy / DECAY_PER_SECOND;
+    user.nextZeroTime = new Date(now + secondsToZero * 1000).getTime();
+  } else {
+    user.nextZeroTime = null;
+  }
 
   user.lastUpdate = now;
 }
@@ -117,35 +142,30 @@ function renderUsers() {
   const now = Date.now();
 
   users.forEach(u => {
-    // Laske hetkellinen ilo
-    let currentJoy = u.totalJoy;
+    // Hetkellinen ilo
+    let joyNow = u.totalJoy;
 
     u.growths.forEach(g => {
       const secondsPassed = Math.min((now - g.start) / 1000, GROWTH_DURATION);
-      const portion = g.amount * (secondsPassed / GROWTH_DURATION);
-      currentJoy += portion;
+      joyNow += g.amount * (secondsPassed / GROWTH_DURATION);
     });
 
-    // Laske huipun hetki
-    const latestGrowth = u.growths[u.growths.length - 1];
-    let peakTimeStr = "-";
-    if (latestGrowth) {
-      const peakTime = new Date(latestGrowth.start + GROWTH_DURATION * 1000);
-      peakTimeStr = peakTime.toLocaleTimeString();
-    }
+    // Viimeisin kasvu huippua varten
+    const latestGrowth = u.growths.length > 0 ? u.growths[u.growths.length - 1] : null;
+    const peakTimeStr = latestGrowth
+      ? new Date(latestGrowth.start + GROWTH_DURATION * 1000).toLocaleTimeString()
+      : "-";
 
-    // Laske nolla-aika
-    let zeroTimeStr = "-";
-    if (currentJoy > 0) {
-      const secondsUntilZero = currentJoy / DECAY_PER_SECOND;
-      const zeroTime = new Date(now + secondsUntilZero * 1000);
-      zeroTimeStr = zeroTime.toLocaleTimeString();
-    }
+    const zeroTimeStr = u.nextZeroTime
+      ? new Date(u.nextZeroTime).toLocaleTimeString()
+      : "-";
 
     const div = document.createElement("div");
     div.textContent =
-      `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue}) – ` +
-      `ilo: ${currentJoy.toFixed(3)}, huippu klo: ${peakTimeStr}, nolla klo: ${zeroTimeStr}`;
+      `${u.profileImage} ${u.username} (lisäarvo: ${u.extraValue})\n` +
+      `ilo nyt: ${joyNow.toFixed(3)}, odotettu huippu: ${u.expectedPeakJoy.toFixed(3)}, ` +
+      `saavutettu huippu: ${u.maxJoy.toFixed(3)}\n` +
+      `huippu klo: ${peakTimeStr}, nolla klo: ${zeroTimeStr}`;
     container.appendChild(div);
   });
 }
