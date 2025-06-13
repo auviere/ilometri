@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8" />
+<title>Nautinta-avustin</title>
+<style>
+  #userInfo, #loginForm {
+    margin: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loginForm">
+  <h2>Tervetuloa nauttimaan</h2>
+  <input type="text" id="usernameInput" placeholder="Nimi" />
+  <input type="text" id="usermassInput" placeholder="Paino" />
+  <button id="loginBtn">Nauttimaan</button>
+</div>
+
+<div id="userInfo" style="display:none;">
+  <h2>Tervetulloo, <span id="userNameDisplay"></span></h2>
+  <h2>Ilon määrä: <span id="userIloDisplay"></span></h2>
+  <button id="juomanappi">🍺</button>
+</div>
+
+<script>
+  const storageKey = 'userData';
+  const loginForm = document.getElementById('loginForm');
+  const userInfo = document.getElementById('userInfo');
+  const userNameDisplay = document.getElementById('userNameDisplay');
+  const userIloDisplay = document.getElementById('userIloDisplay');
+  const usernameInput = document.getElementById('usernameInput');
+  const usermassInput = document.getElementById('usermassInput');
+  const loginBtn = document.getElementById('loginBtn');
+  const juomanappi = document.getElementById('juomanappi');
+  let nautinnat =  [];
+  
+function iloKasvaa(user) {
+  const nyt = Date.now();
+  let effects = localStorage.getItem('nautintaData');
+  let totalEffect = 0;
+  let nautinnat = [];
+
+  try {
+    nautinnat = JSON.parse(effects);
+    if (Array.isArray(nautinnat)) {
+      for (const effect of nautinnat) {
+        const kuluma = (nyt - effect.time) / 1000;
+        const kulutettu = Math.min(kuluma * effect.persec, effect.effect);
+        totalEffect += kulutettu;
+        totalEffect -= kuluma * 0.00004444444; // pieni lasku iloarvosta
+        effect.effect -= kulutettu;
+        effect.time = nyt;
+      }
+    }
+  } catch (e) {
+    console.error('Virhe nautintaData:n parsinnassa:', e);
+  }
+
+  user.ilo = totalEffect;
+  user.time = nyt;
+  localStorage.setItem(storageKey, JSON.stringify(user));
+  localStorage.setItem('nautintaData', JSON.stringify(
+    nautinnat.filter(e => e.effect > 0)
+  ));
+
+  return user;
+}
+
+
+  // Tarkistetaan löytyykö käyttäjätiedot localStoragesta
+  function checkUser() {
+  const stored = localStorage.getItem(storageKey);
+  if (stored) {
+    let user = JSON.parse(stored);
+    user = iloKasvaa(user); // käytä palautettua versiota
+    showUserInfo(user);
+  } else {
+    showLoginForm();
+  }
+}
+
+
+  // Näytetään kirjautumis-/rekisteröitymislomake
+  function showLoginForm() {
+    loginForm.style.display = 'block';
+    userInfo.style.display = 'none';
+  }
+
+  // Näytetään käyttäjätiedot
+  function showUserInfo(user) {
+    userNameDisplay.textContent = user.name;
+	userIloDisplay.textContent = user.ilo.toFixed(2);
+	loginForm.style.display = 'none';
+  userInfo.style.display = 'block';
+  }
+
+  // Kirjaudu / rekisteröidy -nappi
+  loginBtn.addEventListener('click', () => {
+    const username = usernameInput.value.trim();
+	const usermass = parseFloat(usermassInput.value.trim());
+	const userilo = 0;
+	const usertime = Date.now();
+	
+if (username && !isNaN(usermass)) {
+  const user = {
+    name: username,
+    mass: usermass,
+	ilo: userilo,
+	time: usertime
+  };
+  localStorage.setItem(storageKey, JSON.stringify(user));
+  showUserInfo(user);
+} else {
+  alert('Anna täydet ja kelvolliset tiedot!');
+}
+  });
+  
+  juomanappi.addEventListener('click', () => {
+  const stored = localStorage.getItem(storageKey);
+  if (stored) {
+    const user = JSON.parse(stored);
+    const nautinta = {
+      effect: 15 / (user.mass * 680) * 1000,
+	  persec: (15 / (user.mass * 680) * 1000) / 1800,
+      time: Date.now()
+    };
+	
+
+    let storedData = localStorage.getItem('nautintaData');
+    try {
+      nautinnat = JSON.parse(storedData);
+      if (!Array.isArray(nautinnat)) {
+        nautinnat = [];
+      }
+    } catch (e) {
+      nautinnat = [];
+    }
+
+    nautinnat.push(nautinta);
+    localStorage.setItem('nautintaData', JSON.stringify(nautinnat));
+  } else {
+    alert('Käyttäjätietoja ei löytynyt!');
+  }
+});
+
+  // Tarkistetaan käyttäjä sivun latautuessa
+  checkUser();
+  setInterval(() => {
+  const stored = localStorage.getItem(storageKey);
+  if (stored) {
+    const user = JSON.parse(stored);
+    iloKasvaa(user);
+  }
+}, 5000);
+</script>
+
+</body>
+</html>
