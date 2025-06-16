@@ -13,14 +13,14 @@
 
 <div id="loginForm">
   <h2>Tervetuloa nauttimaan</h2>
-  <input type="text" id="usernameInput" placeholder="Nimi" />
   <input type="text" id="usermassInput" placeholder="Paino" />
   <button id="loginBtn">Nauttimaan</button>
 </div>
 
 <div id="userInfo" style="display:none;">
-  <h2>Tervetulloo, <span id="userNameDisplay"></span></h2>
-  <h2>Ilon määrä: <span id="userIloDisplay"></span></h2>
+  <h2><span id="userIloDisplay"></span></h2>
+  <h2>Ennätyslukema: <span id="maxIloDisplay"></span> ‰</h2>
+  <h2>Minuutteja nolliin: <span id="nollaIloDisplay"></span></h2>
   <button id="juomanappi">🍺</button>
 </div>
 
@@ -28,9 +28,9 @@
   const storageKey = 'userData';
   const loginForm = document.getElementById('loginForm');
   const userInfo = document.getElementById('userInfo');
-  const userNameDisplay = document.getElementById('userNameDisplay');
   const userIloDisplay = document.getElementById('userIloDisplay');
-  const usernameInput = document.getElementById('usernameInput');
+  const maxIloDisplay = document.getElementById('maxIloDisplay');
+  const nollaIloDisplay = document.getElementById('nollaIloDisplay');
   const usermassInput = document.getElementById('usermassInput');
   const loginBtn = document.getElementById('loginBtn');
   const juomanappi = document.getElementById('juomanappi');
@@ -41,6 +41,7 @@ function iloKasvaa(user) {
   let effects = localStorage.getItem('nautintaData');
   let totalEffect = user.ilo;
   let nautinnat = [];
+  let odotus = 0;
 
   try {
     nautinnat = JSON.parse(effects);
@@ -48,11 +49,10 @@ function iloKasvaa(user) {
       for (const nautinta of nautinnat) {
         const kuluma = (nyt - nautinta.time) / 1000;
         const kulutettu = Math.min(kuluma * nautinta.persec, nautinta.effect);
-        totalEffect += kulutettu;
-        //totalEffect -= kuluma * 0.00004444444;
-		
+        totalEffect += kulutettu;		
         nautinta.effect -= kulutettu;
         nautinta.time = nyt;
+		odotus += nautinta.effect;
       }
     }
   } catch (e) {
@@ -64,7 +64,12 @@ function iloKasvaa(user) {
   if (totalEffect < 0) {
   totalEffect = 0;}
   user.ilo = totalEffect;
+  user.huippu = user.ilo + odotus;
+  if (user.ilo > user.max) { user.max = user.ilo;}
   user.time = nyt;
+  if (user.ilo < user.huippu) {user.nolla = parseInt(user.huippu / 0.002666666);}
+  else if (user.ilo >= user.huippu) {user.nolla = parseInt(user.ilo / 0.002666666);}
+  user.nolla = parseInt(user.huippu / 0.002666666);
   localStorage.setItem(storageKey, JSON.stringify(user));
   localStorage.setItem('nautintaData', JSON.stringify(
     nautinnat.filter(e => e.effect > 0)
@@ -95,24 +100,27 @@ function iloKasvaa(user) {
 
   // Näytetään käyttäjätiedot
   function showUserInfo(user) {
-    userNameDisplay.textContent = user.name;
-	userIloDisplay.textContent = user.ilo.toFixed(2);
+    if (user.ilo < user.huippu) {userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰ -> -> -> " + user.huippu.toFixed(2) + " ‰";}
+    else if (user.ilo >= user.huippu) {userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰ ja laskee :(";}
+	maxIloDisplay.textContent = user.max.toFixed(2);
+	nollaIloDisplay.textContent = user.nolla;
 	loginForm.style.display = 'none';
   userInfo.style.display = 'block';
   }
 
   // Kirjaudu / rekisteröidy -nappi
   loginBtn.addEventListener('click', () => {
-    const username = usernameInput.value.trim();
 	const usermass = parseFloat(usermassInput.value.trim());
 	const userilo = 0;
 	const usertime = Date.now();
 	
-if (username && !isNaN(usermass)) {
+if (!isNaN(usermass)) {
   const user = {
-    name: username,
     mass: usermass,
 	ilo: userilo,
+	huippu: 0,
+	max: 0,
+	nolla: 0,
 	time: usertime
   };
   localStorage.setItem(storageKey, JSON.stringify(user));
