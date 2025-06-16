@@ -39,25 +39,30 @@
 function iloKasvaa(user) {
   const nyt = Date.now();
   let effects = localStorage.getItem('nautintaData');
-  let totalEffect = 0;
+  let totalEffect = user.ilo;
   let nautinnat = [];
 
   try {
     nautinnat = JSON.parse(effects);
     if (Array.isArray(nautinnat)) {
-      for (const effect of nautinnat) {
-        const kuluma = (nyt - effect.time) / 1000;
-        const kulutettu = Math.min(kuluma * effect.persec, effect.effect);
+      for (const nautinta of nautinnat) {
+        const kuluma = (nyt - nautinta.time) / 1000;
+        const kulutettu = Math.min(kuluma * nautinta.persec, nautinta.effect);
         totalEffect += kulutettu;
-        totalEffect -= kuluma * 0.00004444444; // pieni lasku iloarvosta
-        effect.effect -= kulutettu;
-        effect.time = nyt;
+        //totalEffect -= kuluma * 0.00004444444;
+		
+        nautinta.effect -= kulutettu;
+        nautinta.time = nyt;
       }
     }
   } catch (e) {
     console.error('Virhe nautintaData:n parsinnassa:', e);
   }
-
+  const kuluma = (nyt - user.time) / 1000;
+  //const kuluma = 1;
+  totalEffect -= kuluma * 0.00004444444;
+  if (totalEffect < 0) {
+  totalEffect = 0;}
   user.ilo = totalEffect;
   user.time = nyt;
   localStorage.setItem(storageKey, JSON.stringify(user));
@@ -147,13 +152,13 @@ if (username && !isNaN(usermass)) {
 
   // Tarkistetaan käyttäjä sivun latautuessa
   checkUser();
-  setInterval(() => {
-  const stored = localStorage.getItem(storageKey);
-  if (stored) {
-    const user = JSON.parse(stored);
-    iloKasvaa(user);
-  }
+    setInterval(() => {
+  checkUser();
 }, 5000);
+//  const stored = localStorage.getItem(storageKey);
+//  if (stored) {
+//    const user = JSON.parse(stored);
+//  }
 </script>
 
 </body>
