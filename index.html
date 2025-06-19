@@ -5,28 +5,36 @@
 <title>Nautinta-avustin</title>
 <style>
   #userInfo, #loginForm {
-    margin: 25vw;
-	max-width: 50vw;
+	margin-top: 25vw;
 	text-align: center;
+	color: white;
+	background-color: dimgray;
   }
   #juomanappi {
-  margin: 10vw;
+  margin-top: 75vw;
   font-size: 200px;
+  background-color: dimgray;
+  }
+  #userIloDisplay {
+  font-size: 64px;
+  }
+  #loginForm, #usermassInput, #loginBtn{
+  font-size: 64px;
   }
 </style>
 </head>
-<body>
-
+<body style="background-color:dimgray;">
 <div id="loginForm">
   <h2>Tervetuloa nauttimaan</h2>
-  <input type="text" id="usermassInput" placeholder="Paino" />
+  <input type="text" id="usermassInput" placeholder="Elopaino kg" />
   <button id="loginBtn">Nauttimaan</button>
 </div>
 
 <div id="userInfo" style="display:none;">
   <h2><span id="userIloDisplay"></span></h2>
+  <h2><span id="huippuIloDisplay"></span></h2>
   <h2>Ennätyslukema: <span id="maxIloDisplay"></span> ‰</h2>
-  <h2>Minuutteja nolliin: <span id="nollaIloDisplay"></span></h2>
+  <h2>Minuutteja tolkkuun: <span id="nollaIloDisplay"></span></h2>
   <button id="juomanappi">🍺</button>
 </div>
 
@@ -35,6 +43,7 @@
   const loginForm = document.getElementById('loginForm');
   const userInfo = document.getElementById('userInfo');
   const userIloDisplay = document.getElementById('userIloDisplay');
+  const huippuIloDisplay = document.getElementById('huippuIloDisplay');
   const maxIloDisplay = document.getElementById('maxIloDisplay');
   const nollaIloDisplay = document.getElementById('nollaIloDisplay');
   const usermassInput = document.getElementById('usermassInput');
@@ -75,7 +84,8 @@ function iloKasvaa(user) {
   user.time = nyt;
   if (user.ilo < user.huippu) {user.nolla = parseInt(user.huippu / 0.002666666);}
   else if (user.ilo >= user.huippu) {user.nolla = parseInt(user.ilo / 0.002666666);}
-  user.nolla = parseInt(user.huippu / 0.002666666);
+  user.nolla = parseInt((user.huippu - 0.5)/ 0.002666666);
+  if (user.nolla < 0) {user.nolla = 0;}
   localStorage.setItem(storageKey, JSON.stringify(user));
   localStorage.setItem('nautintaData', JSON.stringify(
     nautinnat.filter(e => e.effect > 0)
@@ -106,8 +116,16 @@ function iloKasvaa(user) {
 
   // Näytetään käyttäjätiedot
   function showUserInfo(user) {
-    if (user.ilo < user.huippu) {userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰ -> -> -> " + user.huippu.toFixed(2) + " ‰";}
-    else if (user.ilo >= user.huippu) {userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰ ja laskee :(";}
+    if (user.ilo < user.huippu) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Matkalla huipulle 👉🏻 " + user.huippu.toFixed(2) + " ‰";
+	}
+    else if (user.ilo >= user.huippu && user.huippu > 0) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Laskusuunnassa 😢";}
+    else if (user.huippu = 0) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Nollissa ollaan";}
 	maxIloDisplay.textContent = user.max.toFixed(2);
 	nollaIloDisplay.textContent = user.nolla;
 	loginForm.style.display = 'none';
