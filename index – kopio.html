@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8" />
+<title>Nautinta-avustin</title>
+<style>
+  #userInfo, #loginForm {
+	margin-top: 25vw;
+	text-align: center;
+	color: white;
+	background-color: dimgray;
+  }
+  #juomanappi {
+  margin-top: 75vw;
+  font-size: 200px;
+  background-color: dimgray;
+  }
+  #userIloDisplay {
+  font-size: 64px;
+  }
+  #loginForm, #usermassInput, #loginBtn{
+  font-size: 64px;
+  }
+</style>
+</head>
+<body style="background-color:dimgray;">
+<div id="loginForm">
+  <h2>Tervetuloa nauttimaan</h2>
+  <input type="text" id="usermassInput" placeholder="Elopaino kg" />
+  <button id="loginBtn">Nauttimaan</button>
+</div>
+
+<div id="userInfo" style="display:none;">
+  <h2><span id="userIloDisplay"></span></h2>
+  <h2><span id="huippuIloDisplay"></span></h2>
+  <h2>Ennätyslukema: <span id="maxIloDisplay"></span> ‰</h2>
+  <h2>Minuutteja tolkkuun: <span id="nollaIloDisplay"></span></h2>
+  <div id="juomat">
+  <button class="juoma" data-ml="330" data-pros="4.5">🍺 0.33 / 4.5%</button>
+  <button class="juoma" data-ml="500" data-pros="5.0">🍺 0.5 / 5%</button>
+  <button class="juoma" data-ml="120" data-pros="12">🍷 Viini</button>
+  <button class="juoma" data-ml="40" data-pros="40">🥃 Shotti</button>
+</div>
+</div>
+
+<script>
+  const storageKey = 'userData';
+  const loginForm = document.getElementById('loginForm');
+  const userInfo = document.getElementById('userInfo');
+  const userIloDisplay = document.getElementById('userIloDisplay');
+  const huippuIloDisplay = document.getElementById('huippuIloDisplay');
+  const maxIloDisplay = document.getElementById('maxIloDisplay');
+  const nollaIloDisplay = document.getElementById('nollaIloDisplay');
+  const usermassInput = document.getElementById('usermassInput');
+  const loginBtn = document.getElementById('loginBtn');
+  const juomanapit = document.querySelectorAll('.juoma');
+  let nautinnat =  [];
+  
+function iloKasvaa(user) {
+  const nyt = Date.now();
+  let effects = localStorage.getItem('nautintaData');
+  let totalEffect = user.ilo;
+  let nautinnat = [];
+  let odotus = 0;
+
+  try {
+    nautinnat = JSON.parse(effects);
+    if (Array.isArray(nautinnat)) {
+      for (const nautinta of nautinnat) {
+        const kuluma = (nyt - nautinta.time) / 1000;
+        const kulutettu = Math.min(kuluma * nautinta.persec, nautinta.effect);
+        totalEffect += kulutettu;		
+        nautinta.effect -= kulutettu;
+        nautinta.time = nyt;
+		odotus += nautinta.effect;
+      }
+    }
+  } catch (e) {
+    console.error('Virhe nautintaData:n parsinnassa:', e);
+  }
+  const kuluma = (nyt - user.time) / 1000;
+  //const kuluma = 1;
+  totalEffect -= kuluma * 0.00004444444;
+  if (totalEffect < 0) {
+  totalEffect = 0;}
+  user.ilo = totalEffect;
+  user.huippu = user.ilo + odotus;
+  if (user.ilo > user.max) { user.max = user.ilo;}
+  user.time = nyt;
+  if (user.ilo < user.huippu) {user.nolla = parseInt(user.huippu / 0.002666666);}
+  else if (user.ilo >= user.huippu) {user.nolla = parseInt(user.ilo / 0.002666666);}
+  user.nolla = parseInt((user.huippu - 0.5)/ 0.002666666);
+  if (user.nolla < 0) {user.nolla = 0;}
+  localStorage.setItem(storageKey, JSON.stringify(user));
+  localStorage.setItem('nautintaData', JSON.stringify(
+    nautinnat.filter(e => e.effect > 0)
+  ));
+
+  return user;
+}
+
+
+  // Tarkistetaan löytyykö käyttäjätiedot localStoragesta
+  function checkUser() {
+  const stored = localStorage.getItem(storageKey);
+  if (stored) {
+    let user = JSON.parse(stored);
+    user = iloKasvaa(user); // käytä palautettua versiota
+    showUserInfo(user);
+  } else {
+    showLoginForm();
+  }
+}
+
+
+  // Näytetään kirjautumis-/rekisteröitymislomake
+  function showLoginForm() {
+    loginForm.style.display = 'block';
+    userInfo.style.display = 'none';
+  }
+
+  // Näytetään käyttäjätiedot
+  function showUserInfo(user) {
+    if (user.ilo < user.huippu) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Matkalla huipulle 👉🏻 " + user.huippu.toFixed(2) + " ‰";
+	}
+    else if (user.ilo >= user.huippu && user.huippu > 0) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Laskusuunnassa 😢";}
+    else if (user.huippu = 0) {
+	userIloDisplay.textContent = user.ilo.toFixed(2) + " ‰";
+	huippuIloDisplay.textContent = "Nollissa ollaan";}
+	maxIloDisplay.textContent = user.max.toFixed(2);
+	nollaIloDisplay.textContent = user.nolla;
+	loginForm.style.display = 'none';
+  userInfo.style.display = 'block';
+  }
+
+  // Kirjaudu / rekisteröidy -nappi
+  loginBtn.addEventListener('click', () => {
+	const usermass = parseFloat(usermassInput.value.trim());
+	const userilo = 0;
+	const usertime = Date.now();
+	
+if (!isNaN(usermass)) {
+  const user = {
+    mass: usermass,
+	ilo: userilo,
+	huippu: 0,
+	max: 0,
+	nolla: 0,
+	time: usertime
+  };
+  localStorage.setItem(storageKey, JSON.stringify(user));
+  showUserInfo(user);
+} else {
+  alert('Anna täydet ja kelvolliset tiedot!');
+}
+  });
+  
+
+juomanapit.forEach(nappi => {
+  nappi.addEventListener('click', () => {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      const user = JSON.parse(stored);
+
+      // 🔥 UUSI: luetaan napista koko ja vahvuus
+      const ml = parseFloat(nappi.dataset.ml);
+      const pros = parseFloat(nappi.dataset.pros);
+
+      // 🔥 UUSI: lasketaan alkoholi grammoina
+      const alkoholi = ml * (pros / 100) * 0.789;
+
+      const nautinta = {
+        effect: alkoholi / (user.mass * 680) * 1000,
+        persec: (alkoholi / (user.mass * 680) * 1000) / 1800,
+        time: Date.now()
+      };
+
+      let storedData = localStorage.getItem('nautintaData');
+      try {
+        nautinnat = JSON.parse(storedData);
+        if (!Array.isArray(nautinnat)) {
+          nautinnat = [];
+        }
+      } catch (e) {
+        nautinnat = [];
+      }
+
+      nautinnat.push(nautinta);
+      localStorage.setItem('nautintaData', JSON.stringify(nautinnat));
+    } else {
+      alert('Käyttäjätietoja ei löytynyt!');
+    }
+  });
+});
+
+  // Tarkistetaan käyttäjä sivun latautuessa
+  checkUser();
+    setInterval(() => {
+  checkUser();
+}, 5000);
+//  const stored = localStorage.getItem(storageKey);
+//  if (stored) {
+//    const user = JSON.parse(stored);
+//  }
+</script>
+
+</body>
+</html>
